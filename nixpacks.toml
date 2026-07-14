@@ -1,0 +1,21 @@
+# Railway / Nixpacks — Laravel + Vite
+# Use npm install (not ci) so optional native deps match the Linux builder.
+# Keep NODE_ENV non-production during install so Vite/Tailwind (devDependencies) are available.
+
+[variables]
+NIXPACKS_NODE_VERSION = "22"
+NPM_CONFIG_PRODUCTION = "false"
+
+[phases.install]
+cmds = [
+  "npm install --no-audit --no-fund",
+  "composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev",
+]
+
+[phases.build]
+cmds = [
+  "npm run build",
+]
+
+[start]
+cmd = "php artisan migrate --force && php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan serve --host=0.0.0.0 --port=${PORT:-8000}"

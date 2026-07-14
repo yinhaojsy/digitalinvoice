@@ -1,0 +1,9 @@
+# Railway service config for Laravel + Vite assets
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm install --no-audit --no-fund && npm run build && composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev"
+
+[deploy]
+startCommand = "mkdir -p storage/framework/{cache,sessions,views} storage/logs bootstrap/cache && php artisan migrate --force && php artisan config:cache && php artisan serve --host=0.0.0.0 --port=$PORT"
+restartPolicyType = "ON_FAILURE"
