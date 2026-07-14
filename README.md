@@ -48,3 +48,21 @@ Production FBR URLs are **not** wired in this version.
 See `config/fbr.php` for sandbox URLs and `scenarioId` list.
 
 Docs: [FBR DI API v1.12 PDF](https://download1.fbr.gov.pk/Docs/20257301172130815TechnicalDocumentationforDIAPIV1.12.pdf)
+
+## Railway deploy
+
+Set these **Variables** on the Railway service (required):
+
+| Variable | Example |
+|----------|---------|
+| `APP_KEY` | Output of `php artisan key:generate --show` |
+| `APP_URL` | `https://your-app.up.railway.app` |
+| `APP_ENV` | `production` |
+| `APP_DEBUG` | `true` temporarily to see errors, then `false` |
+| `LOG_CHANNEL` | `stderr` |
+| `NIXPACKS_PHP_VERSION` | `8.4` |
+| `NPM_CONFIG_PRODUCTION` | `false` |
+
+Optional for SQLite (default on this app): leave `DB_CONNECTION` unset or `sqlite`.
+
+For Postgres (recommended later): add Railway Postgres, then set `DB_CONNECTION=pgsql` and the provided `DATABASE_URL` / `DB_*` vars, plus `SESSION_DRIVER=database` and `CACHE_STORE=database` if you want.
