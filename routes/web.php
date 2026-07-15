@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\InvoiceFbrController;
@@ -21,6 +22,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/settings/organization', [OrganizationSettingsController::class, 'update'])->name('settings.organization.update');
 
     Route::patch('/theme', [ThemeController::class, 'update'])->name('theme.update');
+
+    Route::post('/customers/live-status', [CustomerController::class, 'liveStatus'])->name('customers.live-status');
+    Route::resource('customers', CustomerController::class)->except(['show']);
 
     Route::resource('invoices', InvoiceController::class);
     Route::post('/invoices/{invoice}/validate', [InvoiceFbrController::class, 'validateInvoice'])->name('invoices.validate');

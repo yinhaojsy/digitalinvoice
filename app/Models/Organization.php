@@ -33,6 +33,11 @@ class Organization extends Model
         return $this->hasMany(Invoice::class);
     }
 
+    public function customers(): HasMany
+    {
+        return $this->hasMany(Customer::class);
+    }
+
     public function fbrSubmissions(): HasMany
     {
         return $this->hasMany(FbrSubmission::class);

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
 use App\Services\Fbr\FbrReferenceClient;
@@ -43,6 +44,7 @@ class InvoiceController extends Controller
             'scenarios' => config('fbr.scenarios'),
             'invoice' => null,
             'provinces' => $this->fbrReference->provinces($organization),
+            'customers' => $this->customersForSelect($organization?->id),
         ]);
     }
 
@@ -56,6 +58,7 @@ class InvoiceController extends Controller
         $invoice = DB::transaction(function () use ($request, $organization, $data) {
             $invoice = Invoice::create([
                 'organization_id' => $organization->id,
+                'customer_id' => $data['customer_id'] ?? null,
                 'created_by' => $request->user()->id,
                 'status' => Invoice::STATUS_DRAFT,
                 'invoice_type' => $data['invoice_type'],
@@ -102,6 +105,7 @@ class InvoiceController extends Controller
             'invoice' => $invoice,
             'scenarios' => config('fbr.scenarios'),
             'provinces' => $this->fbrReference->provinces($request->user()->organization),
+            'customers' => $this->customersForSelect($request->user()->organization_id),
         ]);
     }
 
@@ -114,6 +118,7 @@ class InvoiceController extends Controller
 
         DB::transaction(function () use ($invoice, $data) {
             $invoice->update([
+                'customer_id' => $data['customer_id'] ?? null,
                 'invoice_type' => $data['invoice_type'],
                 'invoice_date' => $data['invoice_date'],
                 'buyer_ntn_cnic' => $data['buyer_ntn_cnic'] ?? null,
@@ -156,7 +161,14 @@ class InvoiceController extends Controller
     {
         $provinces = $this->fbrReference->provinces($organization);
 
+        $orgId = $organization?->id;
+
         return $request->validate([
+            'customer_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('customers', 'id')->where(fn ($q) => $orgId ? $q->where('organization_id', $orgId) : $q),
+            ],
             'invoice_type' => ['required', Rule::in(['Sale Invoice', 'Debit Note'])],
             'invoice_date' => ['required', 'date'],
             'buyer_ntn_cnic' => ['nullable', 'string', 'max:20'],
@@ -223,5 +235,28 @@ class InvoiceController extends Controller
             $invoice->organization_id === $request->user()->organization_id,
             404
         );
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    private function customersForSelect(?int $organizationId)
+    {
+        if (! $organizationId) {
+            return collect();
+        }
+
+        return Customer::query()
+            ->forOrganization($organizationId)
+            ->orderBy('name')
+            ->get(['id', 'name', 'business_name', 'ntn', 'province', 'business_address'])
+            ->map(fn (Customer $c) => [
+                'id' => $c->id,
+                'name' => $c->name,
+                'business_name' => $c->business_name,
+                'ntn' => $c->ntn,
+                'province' => $c->province,
+                'business_address' => $c->business_address ?? '',
+            ]);
     }
 }

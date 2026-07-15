@@ -19,6 +19,7 @@ class Invoice extends Model
 
     protected $fillable = [
         'organization_id',
+        'customer_id',
         'created_by',
         'status',
         'invoice_type',
@@ -48,6 +49,11 @@ class Invoice extends Model
     public function organization(): BelongsTo
     {
         return $this->belongsTo(Organization::class);
+    }
+
+    public function customer(): BelongsTo
+    {
+        return $this->belongsTo(Customer::class);
     }
 
     public function creator(): BelongsTo

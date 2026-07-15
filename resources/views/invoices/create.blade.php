@@ -7,7 +7,7 @@
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <form method="POST" action="{{ route('invoices.store') }}">
             @csrf
-            @include('invoices._form', ['invoice' => null, 'scenarios' => $scenarios, 'provinces' => $provinces])
+            @include('invoices._form', ['invoice' => null, 'scenarios' => $scenarios, 'provinces' => $provinces, 'customers' => $customers])
         </form>
     </div>
 </x-app-layout>

@@ -1,5 +1,6 @@
 @php
     $isEdit = isset($invoice) && $invoice;
+    $customerList = collect($customers ?? [])->values()->all();
     $items = old('items');
     if ($items === null) {
         if ($isEdit && $invoice->items->isNotEmpty()) {
@@ -49,6 +50,18 @@
 <div
     x-data="{
         items: {{ Js::from(array_values($items)) }},
+        customers: {{ Js::from($customerList) }},
+        customerId: {{ Js::from((string) old('customer_id', $isEdit ? ($invoice->customer_id ?? '') : '')) }},
+        buyerNtn: {{ Js::from(old('buyer_ntn_cnic', $isEdit ? ($invoice->buyer_ntn_cnic ?? '') : '')) }},
+        buyerBusinessName: {{ Js::from(old('buyer_business_name', $isEdit ? $invoice->buyer_business_name : '')) }},
+        buyerProvince: {{ Js::from(old('buyer_province', $isEdit ? $invoice->buyer_province : 'SINDH')) }},
+        buyerAddress: {{ Js::from(old('buyer_address', $isEdit ? $invoice->buyer_address : '')) }},
+        buyerRegistrationType: {{ Js::from(old('buyer_registration_type', $isEdit ? $invoice->buyer_registration_type : 'Registered')) }},
+        scenarioId: {{ Js::from(old('scenario_id', $isEdit ? $invoice->scenario_id : 'SN001')) }},
+        liveLoading: false,
+        liveStatus: null,
+        liveUrl: {{ Js::from(route('customers.live-status')) }},
+        csrf: {{ Js::from(csrf_token()) }},
         addItem() {
             this.items.push({
                 hs_code: '', product_description: '', rate: '18%', uom: 'Numbers, pieces, units',
@@ -61,7 +74,54 @@
         },
         removeItem(index) {
             if (this.items.length > 1) this.items.splice(index, 1);
-        }
+        },
+        async onCustomerChange() {
+            this.liveStatus = null;
+            if (! this.customerId) return;
+            const customer = this.customers.find(c => String(c.id) === String(this.customerId));
+            if (! customer) return;
+            this.buyerNtn = customer.ntn || '';
+            this.buyerBusinessName = customer.business_name || '';
+            this.buyerProvince = customer.province || this.buyerProvince;
+            this.buyerAddress = customer.business_address || this.buyerAddress;
+            await this.fetchLiveStatus();
+        },
+        async fetchLiveStatus() {
+            if (! this.buyerNtn) return;
+            this.liveLoading = true;
+            this.liveStatus = null;
+            try {
+                const response = await fetch(this.liveUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': this.csrf,
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    body: JSON.stringify({
+                        ntn: this.buyerNtn,
+                        customer_id: this.customerId || null,
+                    }),
+                });
+                const data = await response.json();
+                if (! response.ok) {
+                    this.liveStatus = { ok: false, messages: [], errors: [data.message || 'Live status check failed.'] };
+                    return;
+                }
+                this.liveStatus = data;
+                if (data.registration_type) {
+                    this.buyerRegistrationType = data.registration_type;
+                }
+                if (data.suggested_scenario) {
+                    this.scenarioId = data.suggested_scenario;
+                }
+            } catch (e) {
+                this.liveStatus = { ok: false, messages: [], errors: ['Could not reach FBR live status. You can still continue.'] };
+            } finally {
+                this.liveLoading = false;
+            }
+        },
     }"
     class="space-y-6"
 >
@@ -82,27 +142,81 @@
             </div>
             <div>
                 <x-input-label for="scenario_id" value="Sandbox scenario ID" />
-                <select id="scenario_id" name="scenario_id" class="mt-1 block w-full rounded-md border-ink-300 dark:border-ink-700 dark:bg-ink-950 dark:text-ink-100 shadow-sm focus:border-sun-500 focus:ring-sun-500" required>
+                <select id="scenario_id" name="scenario_id" x-model="scenarioId" class="mt-1 block w-full rounded-md border-ink-300 dark:border-ink-700 dark:bg-ink-950 dark:text-ink-100 shadow-sm focus:border-sun-500 focus:ring-sun-500" required>
                     @foreach ($scenarios as $id => $label)
-                        <option value="{{ $id }}" @selected(old('scenario_id', $isEdit ? $invoice->scenario_id : 'SN001') === $id)>{{ $id }} — {{ $label }}</option>
+                        <option value="{{ $id }}">{{ $id }} — {{ $label }}</option>
                     @endforeach
                 </select>
             </div>
             <div>
                 <x-input-label for="buyer_registration_type" value="Buyer registration type" />
-                <select id="buyer_registration_type" name="buyer_registration_type" class="mt-1 block w-full rounded-md border-ink-300 dark:border-ink-700 dark:bg-ink-950 dark:text-ink-100 shadow-sm focus:border-sun-500 focus:ring-sun-500">
+                <select id="buyer_registration_type" name="buyer_registration_type" x-model="buyerRegistrationType" class="mt-1 block w-full rounded-md border-ink-300 dark:border-ink-700 dark:bg-ink-950 dark:text-ink-100 shadow-sm focus:border-sun-500 focus:ring-sun-500">
                     @foreach (['Registered', 'Unregistered'] as $reg)
-                        <option value="{{ $reg }}" @selected(old('buyer_registration_type', $isEdit ? $invoice->buyer_registration_type : 'Registered') === $reg)>{{ $reg }}</option>
+                        <option value="{{ $reg }}">{{ $reg }}</option>
                     @endforeach
                 </select>
             </div>
+            <div class="sm:col-span-2">
+                <div class="flex items-end justify-between gap-3">
+                    <div class="flex-1">
+                        <x-input-label for="customer_id" value="Customer" />
+                        <select
+                            id="customer_id"
+                            name="customer_id"
+                            x-model="customerId"
+                            @change="onCustomerChange()"
+                            class="mt-1 block w-full rounded-md border-ink-300 dark:border-ink-700 dark:bg-ink-950 dark:text-ink-100 shadow-sm focus:border-sun-500 focus:ring-sun-500"
+                        >
+                            <option value="">Manual buyer entry</option>
+                            @foreach ($customerList as $customer)
+                                <option value="{{ $customer['id'] }}">{{ $customer['name'] }} — {{ $customer['business_name'] }} ({{ $customer['ntn'] }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <a href="{{ route('customers.create') }}" class="mb-0.5 text-sm text-sun-700 dark:text-sun-400 whitespace-nowrap">Add customer</a>
+                </div>
+                <p class="mt-1 text-xs text-ink-500">Selecting a customer fills buyer fields and checks FBR Get_Reg_Type + STATL (soft warnings only).</p>
+            </div>
+            <div class="sm:col-span-2" x-show="liveLoading || liveStatus" x-cloak>
+                <div x-show="liveLoading" class="rounded-lg border border-ink-200 dark:border-ink-700 bg-ink-50 dark:bg-ink-950 px-3 py-2 text-sm text-ink-600 dark:text-ink-300">
+                    Checking buyer status with FBR…
+                </div>
+                <div
+                    x-show="!liveLoading && liveStatus"
+                    class="rounded-lg border px-3 py-2 text-sm space-y-1"
+                    :class="(liveStatus?.errors?.length || (liveStatus?.statl_status && liveStatus.statl_status.toLowerCase().includes('in-active'))) ? 'border-amber-400 bg-amber-50 text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100' : 'border-emerald-400 bg-emerald-50 text-emerald-950 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-100'"
+                >
+                    <p class="font-medium">
+                        FBR live status
+                        <span x-show="liveStatus?.registration_type" x-text="'· Reg: ' + liveStatus.registration_type"></span>
+                        <span x-show="liveStatus?.statl_status" x-text="'· STATL: ' + liveStatus.statl_status"></span>
+                    </p>
+                    <template x-for="(message, i) in (liveStatus?.messages || [])" :key="'m'+i">
+                        <p x-text="message"></p>
+                    </template>
+                    <template x-for="(error, i) in (liveStatus?.errors || [])" :key="'e'+i">
+                        <p class="text-rose-700 dark:text-rose-300" x-text="error"></p>
+                    </template>
+                    <p class="text-xs opacity-80">These are guidance only — you can still save and post the invoice.</p>
+                </div>
+            </div>
             <div>
                 <x-input-label for="buyer_ntn_cnic" value="Buyer NTN / CNIC" />
-                <x-text-input id="buyer_ntn_cnic" name="buyer_ntn_cnic" class="mt-1 block w-full" :value="old('buyer_ntn_cnic', $isEdit ? $invoice->buyer_ntn_cnic : '')" />
+                <div class="mt-1 flex gap-2">
+                    <x-text-input id="buyer_ntn_cnic" name="buyer_ntn_cnic" class="block w-full" x-model="buyerNtn" />
+                    <button
+                        type="button"
+                        @click="fetchLiveStatus()"
+                        class="shrink-0 rounded-md border border-ink-300 dark:border-ink-600 px-3 text-sm hover:bg-ink-50 dark:hover:bg-ink-800"
+                        :disabled="liveLoading || !buyerNtn"
+                    >
+                        Check FBR
+                    </button>
+                </div>
             </div>
             <div>
                 <x-input-label for="buyer_business_name" value="Buyer business name" />
-                <x-text-input id="buyer_business_name" name="buyer_business_name" class="mt-1 block w-full" :value="old('buyer_business_name', $isEdit ? $invoice->buyer_business_name : '')" required />
+                <x-text-input id="buyer_business_name" name="buyer_business_name" class="mt-1 block w-full" x-model="buyerBusinessName" required />
             </div>
             <div>
                 <x-input-label for="buyer_province" value="Buyer province" />
@@ -111,12 +225,13 @@
                     :provinces="$provinces ?? []"
                     :value="old('buyer_province', $isEdit ? $invoice->buyer_province : 'SINDH')"
                     required
+                    x-model="buyerProvince"
                 />
                 <x-input-error :messages="$errors->get('buyer_province')" class="mt-2" />
             </div>
             <div>
                 <x-input-label for="buyer_address" value="Buyer address" />
-                <x-text-input id="buyer_address" name="buyer_address" class="mt-1 block w-full" :value="old('buyer_address', $isEdit ? $invoice->buyer_address : '')" required />
+                <x-text-input id="buyer_address" name="buyer_address" class="mt-1 block w-full" x-model="buyerAddress" required />
             </div>
             <div class="sm:col-span-2">
                 <x-input-label for="invoice_ref_no" value="Invoice ref no (debit notes)" />
