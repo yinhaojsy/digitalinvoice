@@ -34,7 +34,13 @@
             <div class="grid sm:grid-cols-2 gap-4">
                 <div>
                     <x-input-label for="seller_province" value="Seller province" />
-                    <x-text-input id="seller_province" name="seller_province" class="mt-1 block w-full" :value="old('seller_province', $organization->seller_province)" placeholder="Sindh" />
+                    <x-province-select
+                        name="seller_province"
+                        :provinces="$provinces"
+                        :value="old('seller_province', $organization->seller_province)"
+                    />
+                    <p class="mt-1 text-xs text-ink-500">Values from FBR provinces API (or fallback list).</p>
+                    <x-input-error :messages="$errors->get('seller_province')" class="mt-2" />
                 </div>
                 <div>
                     <x-input-label for="seller_address" value="Seller address" />

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
+use App\Services\Fbr\FbrReferenceClient;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,10 @@ use Illuminate\View\View;
 
 class InvoiceController extends Controller
 {
+    public function __construct(
+        private readonly FbrReferenceClient $fbrReference,
+    ) {}
+
     public function index(Request $request): View
     {
         $organization = $request->user()->organization;
@@ -30,11 +35,14 @@ class InvoiceController extends Controller
         return view('invoices.index', compact('invoices', 'status'));
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
+        $organization = $request->user()->organization;
+
         return view('invoices.create', [
             'scenarios' => config('fbr.scenarios'),
             'invoice' => null,
+            'provinces' => $this->fbrReference->provinces($organization),
         ]);
     }
 
@@ -43,7 +51,7 @@ class InvoiceController extends Controller
         $organization = $request->user()->organization;
         abort_if($organization === null, 404);
 
-        $data = $this->validateInvoice($request);
+        $data = $this->validateInvoice($request, $organization);
 
         $invoice = DB::transaction(function () use ($request, $organization, $data) {
             $invoice = Invoice::create([
@@ -93,6 +101,7 @@ class InvoiceController extends Controller
         return view('invoices.edit', [
             'invoice' => $invoice,
             'scenarios' => config('fbr.scenarios'),
+            'provinces' => $this->fbrReference->provinces($request->user()->organization),
         ]);
     }
 
@@ -101,7 +110,7 @@ class InvoiceController extends Controller
         $this->authorizeInvoice($request, $invoice);
         abort_unless($invoice->isEditable(), 403, 'Posted invoices cannot be edited.');
 
-        $data = $this->validateInvoice($request);
+        $data = $this->validateInvoice($request, $request->user()->organization);
 
         DB::transaction(function () use ($invoice, $data) {
             $invoice->update([
@@ -143,14 +152,16 @@ class InvoiceController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function validateInvoice(Request $request): array
+    private function validateInvoice(Request $request, $organization = null): array
     {
+        $provinces = $this->fbrReference->provinces($organization);
+
         return $request->validate([
             'invoice_type' => ['required', Rule::in(['Sale Invoice', 'Debit Note'])],
             'invoice_date' => ['required', 'date'],
             'buyer_ntn_cnic' => ['nullable', 'string', 'max:20'],
             'buyer_business_name' => ['required', 'string', 'max:255'],
-            'buyer_province' => ['required', 'string', 'max:100'],
+            'buyer_province' => ['required', 'string', 'max:100', Rule::in($provinces)],
             'buyer_address' => ['required', 'string', 'max:500'],
             'buyer_registration_type' => ['required', Rule::in(['Registered', 'Unregistered'])],
             'invoice_ref_no' => ['nullable', 'string', 'max:40'],

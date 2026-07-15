@@ -8,7 +8,7 @@
         <form method="POST" action="{{ route('invoices.update', $invoice) }}">
             @csrf
             @method('PUT')
-            @include('invoices._form', ['invoice' => $invoice, 'scenarios' => $scenarios])
+            @include('invoices._form', ['invoice' => $invoice, 'scenarios' => $scenarios, 'provinces' => $provinces])
         </form>
     </div>
 </x-app-layout>

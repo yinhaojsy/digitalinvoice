@@ -106,7 +106,13 @@
             </div>
             <div>
                 <x-input-label for="buyer_province" value="Buyer province" />
-                <x-text-input id="buyer_province" name="buyer_province" class="mt-1 block w-full" :value="old('buyer_province', $isEdit ? $invoice->buyer_province : 'Sindh')" required />
+                <x-province-select
+                    name="buyer_province"
+                    :provinces="$provinces ?? []"
+                    :value="old('buyer_province', $isEdit ? $invoice->buyer_province : 'SINDH')"
+                    required
+                />
+                <x-input-error :messages="$errors->get('buyer_province')" class="mt-2" />
             </div>
             <div>
                 <x-input-label for="buyer_address" value="Buyer address" />
