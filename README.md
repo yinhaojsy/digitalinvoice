@@ -65,4 +65,11 @@ Set these **Variables** on the Railway service (required):
 
 Optional for SQLite (default on this app): leave `DB_CONNECTION` unset or `sqlite`.
 
-For Postgres (recommended later): add Railway Postgres, then set `DB_CONNECTION=pgsql` and the provided `DATABASE_URL` / `DB_*` vars, plus `SESSION_DRIVER=database` and `CACHE_STORE=database` if you want.
+For Postgres on Railway, set on the **app** service:
+
+| Variable | Value |
+|----------|--------|
+| `DB_CONNECTION` | `pgsql` |
+| `DATABASE_URL` | copy from the Postgres service *(Laravel also accepts this; maps to `DB_URL`)* |
+
+Do **not** set `DB_HOST=127.0.0.1` or `DB_DATABASE=database/database.sqlite` on the app.
