@@ -58,11 +58,6 @@ class OrganizationSettingsController extends Controller
 
         $organization->save();
 
-        // Refresh cache with (possibly new) token on next page load
-        if (filled($token)) {
-            // no-op: next provinces() call will refill cache
-        }
-
         return back()->with('status', 'Organization settings saved. FBR environment remains sandbox-only.');
     }
 }
