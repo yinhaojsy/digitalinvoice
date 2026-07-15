@@ -86,7 +86,10 @@ class InvoiceController extends Controller
     {
         $this->authorizeInvoice($request, $invoice);
 
-        $invoice->load(['items', 'submissions' => fn ($q) => $q->limit(10)]);
+        $invoice->load([
+            'items',
+            'submissions' => fn ($q) => $q->latest()->limit(10),
+        ]);
 
         return view('invoices.show', [
             'invoice' => $invoice,

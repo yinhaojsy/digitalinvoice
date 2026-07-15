@@ -62,6 +62,7 @@ class FbrSandboxClient
                 ->timeout(config('fbr.timeout', 60))
                 ->post($url, $payload);
 
+            $rawBody = $httpResponse->body();
             $body = $httpResponse->json();
             $httpStatus = $httpResponse->status();
         } catch (\Throwable $e) {
@@ -87,7 +88,10 @@ class FbrSandboxClient
 
         $success = $this->isSuccessful($body, $httpStatus);
         $fbrInvoiceNumber = data_get($body, 'invoiceNumber');
-        $errorMessage = $this->extractError($body);
+        $errorMessage = $this->extractError($body, $rawBody);
+        $storedBody = is_array($body)
+            ? $body
+            : ['raw' => $rawBody !== '' ? $rawBody : '(empty body)'];
 
         $submission = FbrSubmission::create([
             'organization_id' => $organization->id,
@@ -96,7 +100,7 @@ class FbrSandboxClient
             'environment' => 'sandbox',
             'http_status' => $httpStatus,
             'request_payload' => $payload,
-            'response_body' => is_array($body) ? $body : ['raw' => $httpResponse->body()],
+            'response_body' => $storedBody,
             'success' => $success,
             'fbr_invoice_number' => $fbrInvoiceNumber,
             'error_message' => $success ? null : $errorMessage,
@@ -136,10 +140,12 @@ class FbrSandboxClient
         return true;
     }
 
-    private function extractError(mixed $body): string
+    private function extractError(mixed $body, string $rawBody = ''): string
     {
         if (! is_array($body)) {
-            return 'Unexpected FBR response.';
+            $snippet = $this->snippet($rawBody !== '' ? $rawBody : '(empty body)');
+
+            return 'Unexpected FBR response. Raw: '.$snippet;
         }
 
         $headerError = data_get($body, 'validationResponse.error');
@@ -163,10 +169,33 @@ class FbrSandboxClient
             return implode(' | ', $messages);
         }
 
-        if (isset($body['message'])) {
-            return (string) $body['message'];
+        foreach (['message', 'error', 'Error', 'Message', 'statusMessage'] as $key) {
+            if (filled(data_get($body, $key))) {
+                return (string) data_get($body, $key);
+            }
         }
 
-        return 'FBR rejected the invoice.';
+        $status = data_get($body, 'validationResponse.status');
+        $statusCode = data_get($body, 'validationResponse.statusCode');
+        if (filled($status) || filled($statusCode)) {
+            return trim('FBR rejected the invoice. status='.(string) $status.' statusCode='.(string) $statusCode);
+        }
+
+        return 'FBR rejected the invoice. Raw: '.$this->snippet(json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '');
+    }
+
+    private function snippet(string $text, int $max = 500): string
+    {
+        $text = trim(preg_replace('/\s+/', ' ', $text) ?? $text);
+
+        if ($text === '') {
+            return '(empty body)';
+        }
+
+        if (mb_strlen($text) <= $max) {
+            return $text;
+        }
+
+        return mb_substr($text, 0, $max).'…';
     }
 }

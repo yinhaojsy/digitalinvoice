@@ -89,18 +89,38 @@
             @else
                 <ul class="divide-y divide-ink-100 dark:divide-ink-800 text-sm">
                     @foreach ($invoice->submissions as $submission)
-                        <li class="px-5 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                            <div>
-                                <span class="capitalize font-medium">{{ $submission->action }}</span>
-                                <span class="text-ink-500">· HTTP {{ $submission->http_status ?? '—' }} · {{ $submission->created_at->diffForHumans() }}</span>
-                                @if ($submission->error_message)
-                                    <div class="text-rose-600 dark:text-rose-400 mt-1">{{ $submission->error_message }}</div>
-                                @endif
-                                @if ($submission->fbr_invoice_number)
-                                    <div class="font-mono text-xs text-emerald-700 dark:text-emerald-300 mt-1">{{ $submission->fbr_invoice_number }}</div>
-                                @endif
+                        <li class="px-5 py-4 space-y-3">
+                            <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                                <div>
+                                    <span class="capitalize font-medium">{{ $submission->action }}</span>
+                                    <span class="text-ink-500">· HTTP {{ $submission->http_status ?? '—' }} · {{ $submission->created_at->diffForHumans() }}</span>
+                                    @if ($submission->error_message)
+                                        <div class="text-rose-600 dark:text-rose-400 mt-1 break-words">{{ $submission->error_message }}</div>
+                                    @endif
+                                    @if ($submission->fbr_invoice_number)
+                                        <div class="font-mono text-xs text-emerald-700 dark:text-emerald-300 mt-1">{{ $submission->fbr_invoice_number }}</div>
+                                    @endif
+                                </div>
+                                <span class="{{ $submission->success ? 'text-emerald-600' : 'text-rose-600' }} text-xs font-semibold uppercase shrink-0">{{ $submission->success ? 'OK' : 'Failed' }}</span>
                             </div>
-                            <span class="{{ $submission->success ? 'text-emerald-600' : 'text-rose-600' }} text-xs font-semibold uppercase">{{ $submission->success ? 'OK' : 'Failed' }}</span>
+
+                            @if ($submission->response_body)
+                                <details class="rounded-lg border border-ink-200 dark:border-ink-700 bg-ink-50 dark:bg-ink-950/50" @if (! $submission->success) open @endif>
+                                    <summary class="cursor-pointer px-3 py-2 text-xs font-medium text-ink-600 dark:text-ink-300 select-none">
+                                        FBR response body
+                                    </summary>
+                                    <pre class="px-3 pb-3 text-xs font-mono text-ink-800 dark:text-ink-200 overflow-x-auto whitespace-pre-wrap break-all max-h-80 overflow-y-auto">{{ json_encode($submission->response_body, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>
+                                </details>
+                            @endif
+
+                            @if ($submission->request_payload)
+                                <details class="rounded-lg border border-ink-200 dark:border-ink-700 bg-ink-50 dark:bg-ink-950/50">
+                                    <summary class="cursor-pointer px-3 py-2 text-xs font-medium text-ink-600 dark:text-ink-300 select-none">
+                                        Request payload sent
+                                    </summary>
+                                    <pre class="px-3 pb-3 text-xs font-mono text-ink-800 dark:text-ink-200 overflow-x-auto whitespace-pre-wrap break-all max-h-80 overflow-y-auto">{{ json_encode($submission->request_payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>
+                                </details>
+                            @endif
                         </li>
                     @endforeach
                 </ul>
